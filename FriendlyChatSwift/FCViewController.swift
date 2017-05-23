@@ -113,11 +113,34 @@ class FCViewController: UIViewController, UINavigationControllerDelegate {
     // MARK: Remote Config
     
     func configureRemoteConfig() {
-        // TODO: configure remote configuration settings
+        let remoteConfigSetting = RemoteConfigSettings(developerModeEnabled: true)
+        remoteConfig = RemoteConfig.remoteConfig()
+        remoteConfig.configSettings = remoteConfigSetting!
     }
     
     func fetchConfig() {
-        // TODO: update to the current coniguratation
+        var expirationDuration: Double = 3600 //60'
+        
+        if remoteConfig.configSettings.isDeveloperModeEnabled {
+            // get the new configuration immediatelly
+            expirationDuration = 0
+        }
+        
+        remoteConfig.fetch(withExpirationDuration: expirationDuration) { (status, error) in
+            if let error = error {
+                print("error fetching config: \(error.localizedDescription)")
+                return
+            }
+            
+            if status == .success {
+                print("config fetched")
+                self.remoteConfig.activateFetched()
+                let maxLength = self.remoteConfig["max_message_length"]
+                if maxLength.source != .static {
+                    self.msglength = maxLength.numberValue!
+                }
+            }
+        }
     }
     
     // MARK: Sign In and Out
@@ -140,6 +163,8 @@ class FCViewController: UIViewController, UINavigationControllerDelegate {
             
             configureDatabase()
             configureStorage()
+            configureRemoteConfig()
+            fetchConfig()
         }
     }
     
@@ -265,6 +290,8 @@ extension FCViewController: UITableViewDelegate, UITableViewDataSource {
                 }
                 
                 let img = UIImage(data: imageData!, scale: 50)
+                self.imageCache.setObject(img!, forKey: imageUrl as NSString)
+                
                 // check if the cell is still on the screen, if so set the image
                 if cell == self.messagesTable.cellForRow(at: indexPath) {
                     DispatchQueue.main.async {
@@ -322,18 +349,6 @@ extension FCViewController: UITableViewDelegate, UITableViewDataSource {
         }
     }
     
-    // MARK: Show Image Display
-    
-    func showImageDisplay(image: UIImage) {
-        dismissImageRecognizer.isEnabled = true
-        dismissKeyboardRecognizer.isEnabled = false
-        messageTextField.isEnabled = false
-        UIView.animate(withDuration: 0.25) {
-            self.backgroundBlur.effect = UIBlurEffect(style: .light)
-            self.imageDisplay.alpha = 1.0
-            self.imageDisplay.image = image
-        }
-    }
 }
 
 // MARK: - FCViewController: UIImagePickerControllerDelegate
